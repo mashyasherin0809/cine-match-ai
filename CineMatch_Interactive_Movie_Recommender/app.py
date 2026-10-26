@@ -151,8 +151,28 @@ def api_recommend():
     selected = payload.get("selected", [])
     selected_ratings = payload.get("ratings", {})
     genre = payload.get("genre", "All")
+    if not isinstance(selected, list):
+        return jsonify({"error": "selected must be a list of movie IDs"}), 400
+    if not isinstance(selected_ratings, dict):
+        return jsonify({"error": "ratings must be an object keyed by movie ID"}), 400
+    if not isinstance(genre, str):
+        return jsonify({"error": "genre must be a string"}), 400
+
+    valid_selected = [str(movie_id) for movie_id in selected if str(movie_id) in MOVIE_BY_ID]
+    valid_ratings = {}
+    for movie_id, rating in selected_ratings.items():
+        if str(movie_id) not in MOVIE_BY_ID:
+            continue
+        try:
+            numeric_rating = float(rating)
+        except (TypeError, ValueError):
+            return jsonify({"error": f"rating for {movie_id} must be a number"}), 400
+        if not math.isfinite(numeric_rating) or not 1 <= numeric_rating <= 5:
+            return jsonify({"error": f"rating for {movie_id} must be between 1 and 5"}), 400
+        valid_ratings[str(movie_id)] = numeric_rating
+
     started = time.perf_counter()
-    results = recommend(selected, selected_ratings, genre)
+    results = recommend(valid_selected, valid_ratings, genre)
     elapsed = (time.perf_counter() - started) * 1000
     return jsonify({"recommendations": results, "elapsed_ms": round(elapsed, 2)})
 
